@@ -9,7 +9,7 @@
 #define MAX std::numeric_limits<double>::max()
 #else
 #include <values.h>
-#define MAX DBL_MAX
+#define MAX 99999999999
 #endif
 
 // return the determinant of the matrix with columns a, b, c.
@@ -49,6 +49,11 @@ bool Triangle::intersect(const Ray &r, double t0, double t1, HitRecord &hr) cons
     hr.alpha = 1.0 - beta -gamma;
     hr.beta = beta;
     hr.gamma = gamma;
+    t1 = hr.t;
+    hr.raydepth = r.depth;
+    hr.v = r.e - hr.p;
+    normalize(hr.v);
+    normalize(hr.n);
     hr.n = cross(a-b,a-c);
     normalize(hr.n);
 
@@ -78,18 +83,18 @@ bool Sphere::intersect(const Ray &r, double t0, double t1, HitRecord &hr) const 
     if(delta>0){
         a1 = (-B+sqrt(delta))/2*A;
         a2 = (-B-sqrt(delta))/2*A;
-        if(a1 < a2){
-            a3 = a1;
-        }
-        else{
-            a3 = a2;
-        }
-
+        a3 = a1;
         if(a3 < t0 ||a3 > t1){
             return false;
         }
         hr.t = a3;
         hr.p = r.e + a3 * r.d;
+        hr.n = (hr.p - c) / rad;
+        t1 = hr.t;
+        hr.v = r.e - hr.p;
+        hr.raydepth = r.depth;
+        normalize(hr.v);
+        normalize(hr.n);
         return true;
     }
     else if(delta == 0){
@@ -99,6 +104,12 @@ bool Sphere::intersect(const Ray &r, double t0, double t1, HitRecord &hr) const 
         }
         hr.t = a3;
         hr.p = r.e + a3 * r.d;
+        hr.n = (hr.p - c) / rad;
+        t1 = hr.t;
+        hr.v = r.e - hr.p;
+        hr.raydepth = r.depth;
+        normalize(hr.v);
+        normalize(hr.n);
         return true;
     }
     return false;
@@ -276,12 +287,19 @@ SlVector3 Tracer::shade(const HitRecord &hr) const {
 SlVector3 Tracer::trace(const Ray &r, double t0, double t1) const {
     HitRecord hr;
     SlVector3 color(bcolor);
-  
-    bool hit = false;
+    bool Ishit = false;
+    for (unsigned int k=0; k<surfaces.size(); k++) {
+        if (surfaces[k].first->intersect(r, t0, t1, hr)) { 
+            hr.f = surfaces[k].second;
+            hr.raydepth = r.depth;
+            Ishit = true;
+        }
+    }
 
-    // Step 1 See what a ray hits  
-
-    if (hit) color = shade(hr);
+    if (Ishit == true){
+        color = shade(hr);
+    }
+    color = hr.f.color;
     return color;
 }
 
@@ -378,13 +396,13 @@ int main(int argc, char *argv[]) {
         std::cout<<"usage: trace [opts] input.nff output.ppm"<<std::endl;
         for (unsigned int i=0; i<argc; i++) std::cout<<argv[i]<<std::endl;
         exit(0);
-    }	
+    }
 
-    Tracer tracer(argv[optind++]);
+    Tracer tracer(argv[1]);
     tracer.aperture = aperture;
     tracer.samples = samples;
     tracer.color = color;
     tracer.maxraydepth = maxraydepth;
     tracer.traceImage();
-    tracer.writeImage(argv[optind++]);
+    tracer.writeImage(argv[2]);
 };
